@@ -58,7 +58,54 @@ fn ray_colour(r : &ray::Ray, world: &dyn Hittable, depth: usize) -> Colour {
 	}
 }
 
+fn random_scene(seed: Option<u128>) -> HittableList {
 
+	// TODO so we can reproduce scenes for perf testing
+	match seed {
+		Some(_) => {
+
+		},
+		_ => (),
+	}
+
+	let mut world : HittableList = HittableList::new();
+
+	let ground_material = Rc::new(Lambertian::new(&Colour::new(0.5,0.5,0.5)));
+	world.add(Box::new(Sphere::new(Point3::new(0.0,-100.5,-1.0), 100., ground_material)));
+
+	for a in -11..11 {
+		for b in -11..11 {
+			let choose_mat = rand::random::<f64>();
+			let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
+			if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
+				if choose_mat < 0.8 {
+					// diffuse
+					let albedo = Colour::random() * Colour::random();
+					let mat = Rc::new(Lambertian::new(&albedo));
+					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
+				} else if choose_mat < 0.95 {
+					// metal
+					let albedo = Colour::random_range(0.5, 1.0);
+					let mat = Rc::new(Metal::new(&albedo));
+					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
+				} else {
+					// glass
+					let mat = Rc::new(Dielectric::new(1.5));
+					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
+				}
+			}
+		}
+	}
+
+	let mat1 = Rc::new(Dielectric::new(1.5));
+	world.add(Box::new(Sphere::new(Point3::new(0.0,0.1,0.0), 1.0, mat1)));
+	let mat2 = Rc::new(Lambertian::new(&Colour::new(0.4,0.2,0.1)));
+	world.add(Box::new(Sphere::new(Point3::new(-4.0,1.0,0.0), 1.0, mat2)));
+	let mat3 = Rc::new(Metal::new(&Colour::new(0.7,0.6,0.5)));
+	world.add(Box::new(Sphere::new(Point3::new(4.0,1.0,0.0), 1.0, mat3)));
+
+	world
+}
 
 fn main() {
 	// TODO - add a timing param so it won't write colours, just calculate them
@@ -72,20 +119,10 @@ fn main() {
 	const WIDTH : usize = 400;
 	const HEIGHT : usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
-	// World
-	let mut world : HittableList = HittableList::new();
-	let material_ground = Rc::new(Lambertian::new(&Colour::new(0.8,0.8,0.0)));
-	let material_centre = Rc::new(Lambertian::new(&Colour::new(0.7,0.3,0.3)));
-	let material_left = Rc::new(Metal::new(&Colour::new(0.8,0.8,0.8)));
-	let material_right = Rc::new(Dielectric::new(1.5));
-
-	world.add(Box::new(Sphere::new(Point3::new(0.0,-100.5,-1.0), 100., material_ground)));
-	world.add(Box::new(Sphere::new(Point3::new(0.0,0.0,-1.0), 0.5, material_centre)));
-	world.add(Box::new(Sphere::new(Point3::new(-1.0,0.0,-1.0), 0.5, material_left)));
-	world.add(Box::new(Sphere::new(Point3::new(1.0,0.0,-1.0), -0.4, material_right)));
+	let world = random_scene(None);
 
 	// Camera
-	let camera = Camera::new(ASPECT_RATIO, 90.0, Point3::new(-2.0,2.0,1.0), Point3::new(0.0,0.0,-1.0), Point3::new(0.0,1.0,0.0));
+	let camera = Camera::new(ASPECT_RATIO, 20.0, Point3::new(13.0,2.0,3.0), Point3::new(0.0,0.0,0.0), Point3::new(0.0,1.0,0.0));
 
 
 	// Render
