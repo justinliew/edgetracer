@@ -13,16 +13,8 @@ use crate::lambertian::Lambertian;
 use crate::metal::Metal;
 use crate::dielectric::Dielectric;
 use crate::utils::{clamp};
-
-
-fn write_colour(pixel_colour : Colour, samples_per_pixel: usize) {
-	let scale = 1.0 / (samples_per_pixel as f64);
-	let cr = clamp(pixel_colour.x * scale, 0.0, 0.999);
-	println!("{} {} {}\n",
-		(256.0 * clamp(f64::sqrt(pixel_colour.x * scale), 0.0, 0.999)) as usize,
-		(256.0 * clamp(f64::sqrt(pixel_colour.y * scale), 0.0, 0.999)) as usize,
-		(256.0 * clamp(f64::sqrt(pixel_colour.z * scale), 0.0, 0.999)) as usize);
-}
+use image::codecs::jpeg;
+use image::{RgbImage, ImageBuffer};
 
 fn ray_colour(r : &Ray, world: &dyn Hittable, depth: usize) -> Colour {
 
@@ -95,7 +87,7 @@ fn random_scene(seed: Option<u128>) -> HittableList {
 	world
 }
 
-pub fn do_render() -> u128 {
+pub fn do_render() -> (u128, Vec<u8>) {
 	// TODO - add a timing param so it won't write colours, just calculate them
 
 	let start = Instant::now();
@@ -114,9 +106,9 @@ pub fn do_render() -> u128 {
 
 
 	// Render
-	println!("P3\n{} {}\n255\n", WIDTH, HEIGHT);
+	let mut img: RgbImage = ImageBuffer::new(WIDTH as u32, HEIGHT as u32);
+	let mut buffer : Vec<u8> = vec![0;WIDTH*HEIGHT*3];
 	for j in (0..HEIGHT).rev() {
-		eprint!("\r{:03} scanlines remaining", j);
 		for i in 0..WIDTH {
 			let mut pixel_colour = Colour::new(0.0,0.0,0.0);
 			for _ in 0..SAMPLES_PER_PIXEL {
@@ -126,9 +118,25 @@ pub fn do_render() -> u128 {
 				let c = ray_colour(&r, &world, MAX_DEPTH);
 				pixel_colour = pixel_colour + c;
 			}
-			write_colour(pixel_colour, SAMPLES_PER_PIXEL);
+			let scale = 1.0 / (SAMPLES_PER_PIXEL as f64);
+
+            let pixel = img.get_pixel_mut(i as u32,(HEIGHT-j-1) as u32);
+            *pixel = image::Rgb([(256.0 * clamp(f64::sqrt(pixel_colour.x * scale), 0.0, 0.999)) as u8,
+									(256.0 * clamp(f64::sqrt(pixel_colour.y * scale), 0.0, 0.999)) as u8,
+									(256.0 * clamp(f64::sqrt(pixel_colour.z * scale), 0.0, 0.999)) as u8]);
 		}
 	}
-	eprint!("\ndone {}ms\n", start.elapsed().as_millis());
-	start.elapsed().as_millis()
+	print!("\ndone {}ms\n", start.elapsed().as_millis());
+
+	let mut data = Vec::new();
+	let mut encoder = jpeg::JPEGEncoder::new(&mut data);
+	encoder.encode(
+        img.as_raw(),
+        img.width(),
+        img.height(),
+        <image::Rgb<u8> as image::Pixel>::color_type(),
+    )
+    .unwrap();
+
+	(start.elapsed().as_millis(), data)
 }

@@ -16,7 +16,7 @@ impl Lambertian {
 	}
 }
 impl Material for Lambertian {
-	fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
+	fn scatter(&self, _r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 
 		let mut dir = rec.normal + rand_unit_vector();
 

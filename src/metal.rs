@@ -2,7 +2,7 @@ use crate::vec3::{Colour,Vec3};
 use crate::material::Material;
 use crate::ray::Ray;
 use crate::hittable::HitRecord;
-use crate::utils::{rand_unit_vector, reflect};
+use crate::utils::{reflect};
 
 pub struct Metal {
 	albedo: Colour,
