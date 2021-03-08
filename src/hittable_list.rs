@@ -2,8 +2,9 @@ use crate::hittable::{Hittable};
 use crate::ray::{Ray};
 use crate::hittable::{HitRecord};
 
+#[derive(Clone)]
 pub struct HittableList {
-	list: Vec<Box<dyn Hittable>>,
+	list: Vec<Box<dyn Hittable + Sync + Send>>,
 }
 
 impl HittableList {
@@ -12,7 +13,7 @@ impl HittableList {
 			list: Vec::new()
 		}
 	}
-	pub fn add(&mut self, o: Box<dyn Hittable>) {
+	pub fn add(&mut self, o: Box<dyn Hittable + Sync + Send>) {
 		self.list.push(o);
 	}
 }
@@ -34,5 +35,9 @@ impl Hittable for HittableList {
 		}
 
 		rec
+	}
+
+	fn clone_hittable(&self) -> Box<dyn Hittable + Sync + Send> {
+		Box::new(self.clone())
 	}
 }
