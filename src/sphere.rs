@@ -43,7 +43,7 @@ impl Hittable for Sphere {
 		Some(HitRecord::new(r, root, &outward_normal, Arc::clone(&self.material)))
 	}
 
-	fn clone_hittable(&self) -> Box<Hittable + Sync + Send> {
+	fn clone_hittable(&self) -> Box<dyn Hittable + Sync + Send> {
 		Box::new(self.clone())
 	}
 }
