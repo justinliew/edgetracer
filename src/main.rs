@@ -11,6 +11,10 @@ mod metal;
 mod utils;
 mod render;
 
+#[macro_use]
+extern crate serde;
+
 fn main() {
 	render::do_render();
 }
+

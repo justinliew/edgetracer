@@ -189,11 +189,10 @@ pub fn do_render() -> (u128, Vec<u8>) {
         img.width(),
         img.height(),
 		image::ColorType::Rgb8,
-//        <image::Rgb<u8> as image::Pixel>::color_type(),
     )
     .unwrap();
 
-	img.save("image.jpg").unwrap();
+//	img.save("image.jpg").unwrap();
 
 	(start.elapsed().as_millis(), data)
 }

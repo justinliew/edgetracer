@@ -4,6 +4,7 @@ use crate::ray::Ray;
 use crate::hittable::HitRecord;
 use crate::utils::{reflect};
 
+#[derive(Serialize,Deserialize)]
 pub struct Metal {
 	albedo: Colour,
 }
@@ -16,6 +17,8 @@ impl Metal {
 	}
 
 }
+
+#[typetag::serde]
 impl Material for Metal {
 	fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 		let reflected = reflect(&Vec3::unit_vector(r_in.dir), &rec.normal);

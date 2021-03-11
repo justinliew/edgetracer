@@ -4,6 +4,7 @@ use crate::ray::Ray;
 use crate::hittable::HitRecord;
 use crate::utils::{reflect, refract};
 
+#[derive(Serialize,Deserialize)]
 pub struct Dielectric {
 	ir: f64,
 }
@@ -21,8 +22,9 @@ impl Dielectric {
 		r0 = r0*r0;
 		r0 + (1.0-r0) * f64::powf(1.0 - cosine, 5.0)
 	}
-
 }
+
+#[typetag::serde]
 impl Material for Dielectric {
 	fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 		let refraction_ratio = match rec.front {

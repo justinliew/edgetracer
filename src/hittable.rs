@@ -7,13 +7,13 @@ use std::sync::Arc;
 pub struct HitRecord {
 	pub p: Point3,
 	pub normal: Vec3,
-	pub material: Arc<dyn Material + Sync + Send>,
+	pub material: Arc<dyn Material>,
 	pub t: f64,
 	pub front: bool,
 }
 
 impl HitRecord {
-	pub fn new(r: &Ray, root: f64, outward_normal: &Vec3, m: Arc<dyn Material + Sync + Send>) -> Self {
+	pub fn new(r: &Ray, root: f64, outward_normal: &Vec3, m: Arc<dyn Material>) -> Self {
 		let p = r.at(root);
 		let front = Vec3::dot(&r.dir, &outward_normal) < 0.0;
 		let normal = match front {
@@ -30,14 +30,15 @@ impl HitRecord {
 	}
 }
 
+#[typetag::serde(tag = "type")]
 pub trait Hittable {
 	fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord>;
 
-	fn clone_hittable(&self) -> Box<dyn Hittable + Sync + Send>;
+	fn clone_hittable(&self) -> Box<dyn Hittable>;
 }
 
-impl Clone for Box<dyn Hittable + Sync + Send> {
-    fn clone(&self) -> Box<dyn Hittable + Sync + Send> {
+impl Clone for Box<dyn Hittable> {
+    fn clone(&self) -> Box<dyn Hittable> {
     self.clone_hittable()
     }
 }
