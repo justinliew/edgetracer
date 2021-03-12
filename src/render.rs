@@ -17,6 +17,9 @@ use image::codecs::jpeg;
 use image::{RgbImage, ImageBuffer};
 use std::thread;
 
+use serde_json;
+use futures::{future};
+
 fn ray_colour(r : &Ray, world: &dyn Hittable, depth: usize) -> Colour {
 
 	if depth  <= 0 {
@@ -133,7 +136,18 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize) -> Vec<Scr
 	ret
 }
 
-pub fn do_render() -> (u128, Vec<u8>) {
+// TODO - I need to send the dimensions along
+async fn send_tile_render(world: &HittableList, i: usize, j: usize, dimi: usize, dimj: usize) -> Result<String, Box<dyn std::error::Error>> {
+	let client = reqwest::Client::new();
+	let resp = client.get("https://singularly-integral-cobra.edgecompute.app/rendertile")
+//		.json(world)
+		.send()
+        .await?;
+
+	Ok(resp.text().await?)
+}
+
+pub async fn do_render() -> (u128, Vec<u8>) {
 
 	let start = Instant::now();
 	let world = random_scene(None);
@@ -141,6 +155,7 @@ pub fn do_render() -> (u128, Vec<u8>) {
 	// Render
 	let mut img: RgbImage = ImageBuffer::new(WIDTH as u32, HEIGHT as u32);
 
+	// I've broken this for now, can't figure out how to do send+sync and serialize/deserialize together
 	#[cfg(feature = "local")]
 	{
 		let mut handles : Vec<thread::JoinHandle<Vec<ScreenPixel>>> = Vec::new();
@@ -167,14 +182,38 @@ pub fn do_render() -> (u128, Vec<u8>) {
 	}
 	#[cfg(feature = "edge")]
 	{
+		let mut futures = Vec::new();
 		for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
 			for ti in (0..WIDTH).step_by(TILE_DIM) {
-				let ret = render_tile(&world, ti, tj);
-				for _ in 0..TILE_DIM*TILE_DIM {
-					for t in &ret {
-						let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
-						*pixel = image::Rgb([t.r, t.g, t.b]);
-					}
+
+				// async http request
+				let ret = send_tile_render(&world,ti,tj,TILE_DIM,TILE_DIM);
+				println!("send_tile_render");
+				futures.push(ret);
+
+				// let ret = render_tile(&world, ti, tj);
+				// for _ in 0..TILE_DIM*TILE_DIM {
+				// 	for t in &ret {
+				// 		let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
+				// 		*pixel = image::Rgb([t.r, t.g, t.b]);
+				// 	}
+				// }
+			}
+		}
+		let unpin_futs: Vec<_> = futures.into_iter().map(Box::pin).collect();
+		let mut futs = unpin_futs;
+
+		println!("starting to wait for futures");
+		while !futs.is_empty() {
+			match future::select_all(futs).await {
+				(Ok(val), _, remaining) => {
+					futs = remaining;
+					println!("found one; {} left", futs.len());
+				}
+				(Err(_e), _, remaining) => {
+					// Ignoring all errors
+					futs = remaining;
+					println!("error; {} left", futs.len());
 				}
 			}
 		}

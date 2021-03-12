@@ -17,7 +17,6 @@ impl Lambertian {
 	}
 }
 
-#[typetag::serde]
 impl Material for Lambertian {
 	fn scatter(&self, _r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 

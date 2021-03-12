@@ -18,7 +18,6 @@ impl Metal {
 
 }
 
-#[typetag::serde]
 impl Material for Metal {
 	fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 		let reflected = reflect(&Vec3::unit_vector(r_in.dir), &rec.normal);

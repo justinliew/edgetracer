@@ -24,7 +24,6 @@ impl Dielectric {
 	}
 }
 
-#[typetag::serde]
 impl Material for Dielectric {
 	fn scatter(&self, r_in: &Ray, rec: &HitRecord) -> Option<(Ray, Colour)> {
 		let refraction_ratio = match rec.front {

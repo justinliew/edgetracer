@@ -5,7 +5,9 @@ use crate::hittable::{HitRecord,Hittable};
 
 use std::sync::Arc;
 
-#[derive(Clone,Serialize,Deserialize)]
+use serde::{Serialize,Serializer};
+
+#[derive(Clone)]
 pub struct Sphere {
 	centre: Point3,
 	radius: f64,
@@ -22,7 +24,6 @@ impl Sphere {
 	}
 }
 
-#[typetag::serde]
 impl Hittable for Sphere {
 	fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord> {
 		let oc = r.origin - self.centre;
@@ -47,4 +48,9 @@ impl Hittable for Sphere {
 	fn clone_hittable(&self) -> Box<dyn Hittable> {
 		Box::new(self.clone())
 	}
+
+	fn serialize_hittable(&self) {
+		println!("sphere serialize");
+	}
+
 }

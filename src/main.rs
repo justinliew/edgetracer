@@ -14,7 +14,8 @@ mod render;
 #[macro_use]
 extern crate serde;
 
-fn main() {
-	render::do_render();
+#[tokio::main]
+async fn main() {
+	render::do_render().await;
 }
 

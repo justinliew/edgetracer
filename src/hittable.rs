@@ -30,11 +30,12 @@ impl HitRecord {
 	}
 }
 
-#[typetag::serde(tag = "type")]
 pub trait Hittable {
 	fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord>;
 
 	fn clone_hittable(&self) -> Box<dyn Hittable>;
+
+	fn serialize_hittable(&self); // TODO make a proper return type
 }
 
 impl Clone for Box<dyn Hittable> {
