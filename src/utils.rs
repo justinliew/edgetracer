@@ -33,3 +33,9 @@ pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f64) -> Vec3 {
 	let r_out_parallel = *n * -f64::sqrt(f64::abs(1.0 - r_out_perp.len_sq()));
 	r_out_perp + r_out_parallel
 }
+
+pub fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
+	let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+	r0 = r0*r0;
+	r0 + (1.0-r0) * f64::powf(1.0 - cosine, 5.0)
+}

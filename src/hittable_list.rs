@@ -1,25 +1,21 @@
 use crate::hittable::{Hittable};
 use crate::ray::{Ray};
-use crate::hittable::{HitRecord};
+use crate::hitrecord::HitRecord;
 
-use serde::{Serialize,Serializer};
-
-#[derive(Clone)]
+#[derive(Clone,Serialize,Deserialize)]
 pub struct HittableList {
-	list: Vec<Box<dyn Hittable>>,
+	list: Vec<Hittable>,
 }
 
-impl Serialize for HittableList {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-		println!("serialize hittable_list");
-		for h in &self.list {
-			h.serialize_hittable();
-		}
-		serializer.serialize_i32(0)
-	}
+#[derive(Clone,Serialize,Deserialize)]
+pub struct HittableListWithTile {
+	pub h: HittableList,
+	pub i: usize,
+	pub j: usize,
+	pub dimi: usize,
+	pub dimj: usize,
+	pub height: usize,
+	pub width: usize,
 }
 
 impl HittableList {
@@ -28,14 +24,11 @@ impl HittableList {
 			list: Vec::new()
 		}
 	}
-	pub fn add(&mut self, o: Box<dyn Hittable>) {
+	pub fn add(&mut self, o: Hittable) {
 		self.list.push(o);
 	}
-}
 
-impl Hittable for HittableList {
-
-	fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord> {
+	pub fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord> {
 		let mut rec : Option<HitRecord> = None;
 		let mut closest = tmax;
 
@@ -50,13 +43,5 @@ impl Hittable for HittableList {
 		}
 
 		rec
-	}
-
-	fn clone_hittable(&self) -> Box<dyn Hittable> {
-		Box::new(self.clone())
-	}
-
-	fn serialize_hittable(&self) {
-		println!("hittable_list serialize");
 	}
 }

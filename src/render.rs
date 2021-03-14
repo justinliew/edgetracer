@@ -4,23 +4,25 @@ use std::time::{Instant};
 use std::sync::Arc;
 
 use crate::camera::{Camera};
-use crate::hittable::{Hittable};
-use crate::hittable_list::{HittableList};
+use crate::hittable::Hittable;
+use crate::hittable_list::{HittableList,HittableListWithTile};
+use crate::material::Material;
 use crate::ray::Ray;
-use crate::sphere::Sphere;
 use crate::vec3::{Colour, Point3, Vec3};
-use crate::lambertian::Lambertian;
-use crate::metal::Metal;
-use crate::dielectric::Dielectric;
 use crate::utils::{clamp};
 use image::codecs::jpeg;
 use image::{RgbImage, ImageBuffer};
+
+#[cfg(not(feature = "ecp"))]
 use std::thread;
 
+#[cfg(not(feature = "ecp"))]
 use serde_json;
+
+#[cfg(not(feature = "ecp"))]
 use futures::{future};
 
-fn ray_colour(r : &Ray, world: &dyn Hittable, depth: usize) -> Colour {
+fn ray_colour(r : &Ray, world: &HittableList, depth: usize) -> Colour {
 
 	if depth  <= 0 {
 		return Colour::new(0.0,0.0,0.0);
@@ -54,44 +56,44 @@ fn random_scene(seed: Option<u128>) -> HittableList {
 
 	let mut world : HittableList = HittableList::new();
 
-	let ground_material = Arc::new(Lambertian::new(&Colour::new(0.5,0.5,0.5)));
-	world.add(Box::new(Sphere::new(Point3::new(0.0,-100.5,-1.0), 100., ground_material)));
+	let ground_material = Arc::new(Material::Lambertian{albedo: Colour::new(0.5,0.5,0.5)});
+	world.add(Hittable::Sphere{centre: Point3::new(0.0,-100.5,-1.0), radius: 100., material: ground_material});
 
-	for a in -11..11 {
-		for b in -11..11 {
-			let choose_mat = rand::random::<f64>();
-			let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
-			if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
-				if choose_mat < 0.8 {
-					// diffuse
-					let albedo = Colour::random() * Colour::random();
-					let mat = Arc::new(Lambertian::new(&albedo));
-					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
-				} else if choose_mat < 0.95 {
-					// metal
-					let albedo = Colour::random_range(0.5, 1.0);
-					let mat = Arc::new(Metal::new(&albedo));
-					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
-				} else {
-					// glass
-					let mat = Arc::new(Dielectric::new(1.5));
-					world.add(Box::new(Sphere::new(centre, 0.2, mat)));
-				}
-			}
-		}
-	}
+	// for a in -11..11 {
+	// 	for b in -11..11 {
+	// 		let choose_mat = rand::random::<f64>();
+	// 		let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
+	// 		if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
+	// 			if choose_mat < 0.8 {
+	// 				// diffuse
+	// 				let albedo = Colour::random() * Colour::random();
+	// 				let mat = Arc::new(Material::Lambertian{albedo: albedo});
+	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+	// 			} else if choose_mat < 0.95 {
+	// 				// metal
+	// 				let albedo = Colour::random_range(0.5, 1.0);
+	// 				let mat = Arc::new(Material::Metal{albedo: albedo});
+	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+	// 			} else {
+	// 				// glass
+	// 				let mat = Arc::new(Material::Dielectric{ir: 1.5});
+	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+	// 			}
+	// 		}
+	// 	}
+	// }
 
-	let mat1 = Arc::new(Dielectric::new(1.5));
-	world.add(Box::new(Sphere::new(Point3::new(0.0,0.1,0.0), 1.0, mat1)));
-	let mat2 = Arc::new(Lambertian::new(&Colour::new(0.4,0.2,0.1)));
-	world.add(Box::new(Sphere::new(Point3::new(-4.0,1.0,0.0), 1.0, mat2)));
-	let mat3 = Arc::new(Metal::new(&Colour::new(0.7,0.6,0.5)));
-	world.add(Box::new(Sphere::new(Point3::new(4.0,1.0,0.0), 1.0, mat3)));
+	let mat1 = Arc::new(Material::Dielectric{ir: 1.5});
+	world.add(Hittable::Sphere{centre: Point3::new(0.0,0.1,0.0), radius: 1.0, material: mat1});
+	let mat2 = Arc::new(Material::Lambertian{albedo: Colour::new(0.4,0.2,0.1)});
+	world.add(Hittable::Sphere{centre: Point3::new(-4.0,1.0,0.0), radius: 1.0, material: mat2});
+	let mat3 = Arc::new(Material::Metal{albedo: Colour::new(0.7,0.6,0.5)});
+	world.add(Hittable::Sphere{centre: Point3::new(4.0,1.0,0.0), radius: 1.0, material: mat3});
 
 	world
 }
 
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,Serialize,Deserialize)]
 pub struct ScreenPixel {
 	r: u8,
 	g: u8,
@@ -107,9 +109,9 @@ const ASPECT_RATIO : f64 = 16.0/9.0;
 const WIDTH : usize = 400;
 const HEIGHT : usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
-const TILE_DIM : usize = 16;
+const TILE_DIM : usize = 32;
 
-pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize) -> Vec<ScreenPixel> {
+pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, width: usize, height: usize) -> Vec<ScreenPixel> {
 	let mut ret : Vec<ScreenPixel> = Vec::new();
 	ret.reserve(TILE_DIM*TILE_DIM);
 
@@ -117,7 +119,13 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize) -> Vec<Scr
 	let scale = 1.0 / (SAMPLES_PER_PIXEL as f64);
 
 	for j in 0..TILE_DIM {
+		if tj+j >= height {
+			continue;
+		}
 		for i in 0..TILE_DIM {
+			if ti+i >= width {
+				continue;
+			}
 			let mut pixel_colour = Colour::new(0.0,0.0,0.0);
 			for _ in 0..SAMPLES_PER_PIXEL {
 				let s = (((ti + i) as f64) + rand::random::<f64>()) / ((WIDTH-1) as f64);
@@ -137,10 +145,22 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize) -> Vec<Scr
 }
 
 // TODO - I need to send the dimensions along
+#[cfg(feature = "edge")]
 async fn send_tile_render(world: &HittableList, i: usize, j: usize, dimi: usize, dimj: usize) -> Result<String, Box<dyn std::error::Error>> {
+
+	println!("send_tile_render {} {}", i, j);
+	let body = HittableListWithTile{
+		h: world.clone(),
+		i: i,
+		j: j,
+		dimi: dimi,
+		dimj: dimj,
+		height: HEIGHT,
+		width: WIDTH,
+	};
 	let client = reqwest::Client::new();
-	let resp = client.get("https://singularly-integral-cobra.edgecompute.app/rendertile")
-//		.json(world)
+	let resp = client.post("https://singularly-integral-cobra.edgecompute.app/rendertile")
+		.json(&body)
 		.send()
         .await?;
 
@@ -155,9 +175,9 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 	// Render
 	let mut img: RgbImage = ImageBuffer::new(WIDTH as u32, HEIGHT as u32);
 
-	// I've broken this for now, can't figure out how to do send+sync and serialize/deserialize together
 	#[cfg(feature = "local")]
 	{
+		println!("LOCAL");
 		let mut handles : Vec<thread::JoinHandle<Vec<ScreenPixel>>> = Vec::new();
 		handles.reserve((WIDTH*HEIGHT) / (TILE_DIM*TILE_DIM));
 		// we are missing the top scanline
@@ -165,7 +185,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 			for ti in (0..WIDTH).step_by(TILE_DIM) {
 					let thread_world = world.clone();
 					handles.push(thread::spawn(move || {
-						render_tile(&thread_world, ti,tj)
+						render_tile(&thread_world, ti,tj, WIDTH, HEIGHT)
 					}));
 				}
 		}
@@ -182,13 +202,13 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 	}
 	#[cfg(feature = "edge")]
 	{
+		println!("EDGE");
 		let mut futures = Vec::new();
 		for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
 			for ti in (0..WIDTH).step_by(TILE_DIM) {
 
 				// async http request
 				let ret = send_tile_render(&world,ti,tj,TILE_DIM,TILE_DIM);
-				println!("send_tile_render");
 				futures.push(ret);
 
 				// let ret = render_tile(&world, ti, tj);
@@ -208,7 +228,18 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 			match future::select_all(futs).await {
 				(Ok(val), _, remaining) => {
 					futs = remaining;
-					println!("found one; {} left", futs.len());
+					println!("found one: {} left", futs.len());
+					match serde_json::from_str(&val) {
+						Ok(res) => {
+							let v : Vec<ScreenPixel> = res;
+							for t in v {
+								println!("Found {} {}", t.x, t.y);
+								let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
+								*pixel = image::Rgb([t.r, t.g, t.b]);
+							}
+						},
+						Err(e) => { eprintln!("Error extracting pixels: {}", e)}
+					}
 				}
 				(Err(_e), _, remaining) => {
 					// Ignoring all errors
@@ -219,7 +250,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 		}
 	}
 
-	print!("\ndone {}ms\n", start.elapsed().as_millis());
+	print!("{} took {}ms\n", TILE_DIM, start.elapsed().as_millis());
 
 	let mut data = Vec::new();
 	let mut encoder = jpeg::JpegEncoder::new(&mut data);
@@ -231,7 +262,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
     )
     .unwrap();
 
-//	img.save("image.jpg").unwrap();
+	img.save("image.jpg").unwrap();
 
 	(start.elapsed().as_millis(), data)
 }

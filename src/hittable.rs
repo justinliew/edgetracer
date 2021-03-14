@@ -3,43 +3,43 @@ use crate::ray::{Ray};
 use crate::material::Material;
 
 use std::sync::Arc;
+use serde::{Serialize,Deserialize};
 
-pub struct HitRecord {
-	pub p: Point3,
-	pub normal: Vec3,
-	pub material: Arc<dyn Material>,
-	pub t: f64,
-	pub front: bool,
-}
+use crate::hitrecord::HitRecord;
 
-impl HitRecord {
-	pub fn new(r: &Ray, root: f64, outward_normal: &Vec3, m: Arc<dyn Material>) -> Self {
-		let p = r.at(root);
-		let front = Vec3::dot(&r.dir, &outward_normal) < 0.0;
-		let normal = match front {
-			true => *outward_normal,
-			false => -*outward_normal,
-		};
-		HitRecord{
-			p: p,
-			normal: normal,
-			t: root,
-			front: front,
-			material: m,
-		}
+#[derive(Clone,Serialize,Deserialize)]
+pub enum Hittable {
+	Sphere {
+		centre: Point3,
+		radius: f64,
+		material: Arc<Material>,
 	}
 }
 
-pub trait Hittable {
-	fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord>;
 
-	fn clone_hittable(&self) -> Box<dyn Hittable>;
+impl Hittable {
 
-	fn serialize_hittable(&self); // TODO make a proper return type
-}
+	pub fn hit(&self, r: &Ray, tmin: f64, tmax: f64) -> Option<HitRecord> {
+		match self {
+			Hittable::Sphere{centre, radius, material} => {
+				let oc = r.origin - *centre;
+				let a = r.dir.len_sq();
+				let half_b = Vec3::dot(&oc, &r.dir);
+				let c = oc.len_sq() - radius * radius;
+				let disc = half_b * half_b - a*c;
+				if disc < 0.0 {
+					return None;
+				}
 
-impl Clone for Box<dyn Hittable> {
-    fn clone(&self) -> Box<dyn Hittable> {
-    self.clone_hittable()
-    }
+				let root = (-half_b - disc.sqrt()) / a;
+				if root < tmin || root > tmax {
+					return None;
+				}
+
+				let p = r.at(root);
+				let outward_normal = (p - *centre) / *radius;
+				Some(HitRecord::new(r, root, &outward_normal, Arc::clone(&material)))
+			}
+		}
+	}
 }
