@@ -109,20 +109,21 @@ const ASPECT_RATIO : f64 = 16.0/9.0;
 const WIDTH : usize = 400;
 const HEIGHT : usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
-const TILE_DIM : usize = 32;
+const TILE_DIM : usize = 16;
 
-pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, width: usize, height: usize) -> Vec<ScreenPixel> {
+pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, tile_width: usize, tile_height: usize, width: usize, height: usize) -> Vec<ScreenPixel> {
+	let start = Instant::now();
 	let mut ret : Vec<ScreenPixel> = Vec::new();
 	ret.reserve(width*height);
 
 	let camera = Camera::new(ASPECT_RATIO, 20.0, Point3::new(13.0,2.0,3.0), Point3::new(0.0,0.0,0.0), Point3::new(0.0,1.0,0.0));
 	let scale = 1.0 / (SAMPLES_PER_PIXEL as f64);
 
-	for j in 0..height {
+	for j in 0..tile_height {
 		if tj+j >= height {
 			continue;
 		}
-		for i in 0..width {
+		for i in 0..tile_width {
 			if ti+i >= width {
 				continue;
 			}
@@ -141,7 +142,7 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, width: usi
 						y:tj+j});
 		}
 	}
-	println!("render_tile done");
+	println!("render_tile done {} {} {}", ti,tj, start.elapsed().as_millis());
 	ret
 }
 
@@ -183,7 +184,8 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 		handles.reserve((WIDTH*HEIGHT) / (TILE_DIM*TILE_DIM));
 		// we are missing the top scanline
 		if TILE_DIM >= HEIGHT || TILE_DIM >= WIDTH {
-			let p = render_tile(&world, 0,0, WIDTH, HEIGHT);
+			println!("Single threaded");
+			let p = render_tile(&world, 0,0, WIDTH, HEIGHT, WIDTH, HEIGHT);
 			for t in &p {
 				let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
 				*pixel = image::Rgb([t.r, t.g, t.b]);
@@ -193,11 +195,12 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 				for ti in (0..WIDTH).step_by(TILE_DIM) {
 						let thread_world = world.clone();
 						handles.push(thread::spawn(move || {
-							render_tile(&thread_world, ti,tj, WIDTH, HEIGHT)
+							render_tile(&thread_world, ti,tj, TILE_DIM, TILE_DIM, WIDTH, HEIGHT)
 						}));
 					}
 			}
 
+			println!("Waiting on {} handles", handles.len());
 			for h in handles {
 				let p = h.join().unwrap();
 				for t in &p {
