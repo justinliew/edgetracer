@@ -113,16 +113,16 @@ const TILE_DIM : usize = 32;
 
 pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, width: usize, height: usize) -> Vec<ScreenPixel> {
 	let mut ret : Vec<ScreenPixel> = Vec::new();
-	ret.reserve(TILE_DIM*TILE_DIM);
+	ret.reserve(width*height);
 
 	let camera = Camera::new(ASPECT_RATIO, 20.0, Point3::new(13.0,2.0,3.0), Point3::new(0.0,0.0,0.0), Point3::new(0.0,1.0,0.0));
 	let scale = 1.0 / (SAMPLES_PER_PIXEL as f64);
 
-	for j in 0..TILE_DIM {
+	for j in 0..height {
 		if tj+j >= height {
 			continue;
 		}
-		for i in 0..TILE_DIM {
+		for i in 0..width {
 			if ti+i >= width {
 				continue;
 			}
@@ -141,6 +141,7 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, width: usi
 						y:tj+j});
 		}
 	}
+	println!("render_tile done");
 	ret
 }
 
@@ -181,18 +182,24 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 		let mut handles : Vec<thread::JoinHandle<Vec<ScreenPixel>>> = Vec::new();
 		handles.reserve((WIDTH*HEIGHT) / (TILE_DIM*TILE_DIM));
 		// we are missing the top scanline
-		for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
-			for ti in (0..WIDTH).step_by(TILE_DIM) {
-					let thread_world = world.clone();
-					handles.push(thread::spawn(move || {
-						render_tile(&thread_world, ti,tj, WIDTH, HEIGHT)
-					}));
-				}
-		}
+		if TILE_DIM >= HEIGHT || TILE_DIM >= WIDTH {
+			let p = render_tile(&world, 0,0, WIDTH, HEIGHT);
+			for t in &p {
+				let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
+				*pixel = image::Rgb([t.r, t.g, t.b]);
+			}
+		} else {
+			for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
+				for ti in (0..WIDTH).step_by(TILE_DIM) {
+						let thread_world = world.clone();
+						handles.push(thread::spawn(move || {
+							render_tile(&thread_world, ti,tj, WIDTH, HEIGHT)
+						}));
+					}
+			}
 
-		for h in handles {
-			let p = h.join().unwrap();
-			for _ in 0..TILE_DIM*TILE_DIM {
+			for h in handles {
+				let p = h.join().unwrap();
 				for t in &p {
 					let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
 					*pixel = image::Rgb([t.r, t.g, t.b]);
@@ -210,30 +217,19 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 				// async http request
 				let ret = send_tile_render(&world,ti,tj,TILE_DIM,TILE_DIM);
 				futures.push(ret);
-
-				// let ret = render_tile(&world, ti, tj);
-				// for _ in 0..TILE_DIM*TILE_DIM {
-				// 	for t in &ret {
-				// 		let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
-				// 		*pixel = image::Rgb([t.r, t.g, t.b]);
-				// 	}
-				// }
 			}
 		}
 		let unpin_futs: Vec<_> = futures.into_iter().map(Box::pin).collect();
 		let mut futs = unpin_futs;
 
-		println!("starting to wait for futures");
 		while !futs.is_empty() {
 			match future::select_all(futs).await {
 				(Ok(val), _, remaining) => {
 					futs = remaining;
-					println!("found one: {} left", futs.len());
 					match serde_json::from_str(&val) {
 						Ok(res) => {
 							let v : Vec<ScreenPixel> = res;
 							for t in v {
-								println!("Found {} {}", t.x, t.y);
 								let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
 								*pixel = image::Rgb([t.r, t.g, t.b]);
 							}
