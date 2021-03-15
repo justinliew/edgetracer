@@ -59,29 +59,29 @@ fn random_scene(seed: Option<u128>) -> HittableList {
 	let ground_material = Arc::new(Material::Lambertian{albedo: Colour::new(0.5,0.5,0.5)});
 	world.add(Hittable::Sphere{centre: Point3::new(0.0,-100.5,-1.0), radius: 100., material: ground_material});
 
-	// for a in -11..11 {
-	// 	for b in -11..11 {
-	// 		let choose_mat = rand::random::<f64>();
-	// 		let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
-	// 		if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
-	// 			if choose_mat < 0.8 {
-	// 				// diffuse
-	// 				let albedo = Colour::random() * Colour::random();
-	// 				let mat = Arc::new(Material::Lambertian{albedo: albedo});
-	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-	// 			} else if choose_mat < 0.95 {
-	// 				// metal
-	// 				let albedo = Colour::random_range(0.5, 1.0);
-	// 				let mat = Arc::new(Material::Metal{albedo: albedo});
-	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-	// 			} else {
-	// 				// glass
-	// 				let mat = Arc::new(Material::Dielectric{ir: 1.5});
-	// 				world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-	// 			}
-	// 		}
-	// 	}
-	// }
+	for a in -11..11 {
+		for b in -11..11 {
+			let choose_mat = rand::random::<f64>();
+			let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
+			if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
+				if choose_mat < 0.8 {
+					// diffuse
+					let albedo = Colour::random() * Colour::random();
+					let mat = Arc::new(Material::Lambertian{albedo: albedo});
+					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+				} else if choose_mat < 0.95 {
+					// metal
+					let albedo = Colour::random_range(0.5, 1.0);
+					let mat = Arc::new(Material::Metal{albedo: albedo});
+					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+				} else {
+					// glass
+					let mat = Arc::new(Material::Dielectric{ir: 1.5});
+					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
+				}
+			}
+		}
+	}
 
 	let mat1 = Arc::new(Material::Dielectric{ir: 1.5});
 	world.add(Hittable::Sphere{centre: Point3::new(0.0,0.1,0.0), radius: 1.0, material: mat1});
@@ -109,7 +109,7 @@ const ASPECT_RATIO : f64 = 16.0/9.0;
 const WIDTH : usize = 400;
 const HEIGHT : usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
-const TILE_DIM : usize = 16;
+const TILE_DIM : usize = 64;
 
 pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, tile_width: usize, tile_height: usize, width: usize, height: usize) -> Vec<ScreenPixel> {
 	let start = Instant::now();
