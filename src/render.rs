@@ -7,6 +7,7 @@ use crate::camera::{Camera};
 use crate::hittable::Hittable;
 use crate::hittable_list::{HittableList,HittableListWithTile};
 use crate::material::Material;
+use crate::scenes;
 use crate::ray::Ray;
 use crate::vec3::{Colour, Point3, Vec3};
 use crate::utils::{clamp};
@@ -44,55 +45,6 @@ fn ray_colour(r : &Ray, world: &HittableList, depth: usize) -> Colour {
 	}
 }
 
-fn random_scene(seed: Option<u128>) -> HittableList {
-
-	// TODO so we can reproduce scenes for perf testing
-	match seed {
-		Some(_) => {
-
-		},
-		_ => (),
-	}
-
-	let mut world : HittableList = HittableList::new();
-
-	let ground_material = Arc::new(Material::Lambertian{albedo: Colour::new(0.5,0.5,0.5)});
-	world.add(Hittable::Sphere{centre: Point3::new(0.0,-100.5,-1.0), radius: 100., material: ground_material});
-
-	for a in -11..11 {
-		for b in -11..11 {
-			let choose_mat = rand::random::<f64>();
-			let centre = Point3::new(a as f64 + 0.9*rand::random::<f64>(), 0.2, b as f64 + 0.9*rand::random::<f64>());
-			if (centre - Point3::new(4.0, 0.2, 0.0)).len() > 0.9 {
-				if choose_mat < 0.8 {
-					// diffuse
-					let albedo = Colour::random() * Colour::random();
-					let mat = Arc::new(Material::Lambertian{albedo: albedo});
-					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-				} else if choose_mat < 0.95 {
-					// metal
-					let albedo = Colour::random_range(0.5, 1.0);
-					let mat = Arc::new(Material::Metal{albedo: albedo});
-					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-				} else {
-					// glass
-					let mat = Arc::new(Material::Dielectric{ir: 1.5});
-					world.add(Hittable::Sphere{centre: centre, radius: 0.2, material: mat});
-				}
-			}
-		}
-	}
-
-	let mat1 = Arc::new(Material::Dielectric{ir: 1.5});
-	world.add(Hittable::Sphere{centre: Point3::new(0.0,0.1,0.0), radius: 1.0, material: mat1});
-	let mat2 = Arc::new(Material::Lambertian{albedo: Colour::new(0.4,0.2,0.1)});
-	world.add(Hittable::Sphere{centre: Point3::new(-4.0,1.0,0.0), radius: 1.0, material: mat2});
-	let mat3 = Arc::new(Material::Metal{albedo: Colour::new(0.7,0.6,0.5)});
-	world.add(Hittable::Sphere{centre: Point3::new(4.0,1.0,0.0), radius: 1.0, material: mat3});
-
-	world
-}
-
 #[derive(Clone,Copy,Serialize,Deserialize)]
 pub struct ScreenPixel {
 	r: u8,
@@ -102,11 +54,11 @@ pub struct ScreenPixel {
 	y: usize,
 }
 
-const SAMPLES_PER_PIXEL : usize = 10;
+const SAMPLES_PER_PIXEL : usize = 1;
 const MAX_DEPTH : usize = 10;
 
 const ASPECT_RATIO : f64 = 16.0/9.0;
-const WIDTH : usize = 400;
+const WIDTH : usize = 1024;
 const HEIGHT : usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
 const TILE_DIM : usize = 64;
@@ -118,6 +70,8 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, tile_width
 
 	let camera = Camera::new(ASPECT_RATIO, 20.0, Point3::new(13.0,2.0,3.0), Point3::new(0.0,0.0,0.0), Point3::new(0.0,1.0,0.0));
 	let scale = 1.0 / (SAMPLES_PER_PIXEL as f64);
+
+	let mut raytimings = vec![];
 
 	for j in 0..tile_height {
 		if tj+j >= height {
@@ -132,7 +86,9 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, tile_width
 				let s = (((ti + i) as f64) + rand::random::<f64>()) / ((WIDTH-1) as f64);
 				let t = (((tj + j) as f64) + rand::random::<f64>()) / ((HEIGHT-1) as f64);
 				let r = &camera.get_ray(s,t);
+				let rs = Instant::now();
 				let c = ray_colour(&r, thread_world, MAX_DEPTH);
+				raytimings.push(rs.elapsed().as_nanos());
 				pixel_colour = pixel_colour + c;
 			}
 			ret.push(ScreenPixel{r: (256.0 * clamp(f64::sqrt(pixel_colour.x * scale), 0.0, 0.999)) as u8,
@@ -142,15 +98,16 @@ pub fn render_tile(thread_world: &HittableList, ti: usize, tj: usize, tile_width
 						y:tj+j});
 		}
 	}
-	println!("render_tile done {} {} {}", ti,tj, start.elapsed().as_millis());
-	ret
+//	println!("render_tile done {} {} {}", ti,tj, start.elapsed().as_millis());
+	println!("render_tile done {} {} Avg: {}ns", ti,tj, raytimings.iter().sum::<u128>() as f32 / raytimings.len() as f32);
+ret
 }
 
 // TODO - I need to send the dimensions along
 #[cfg(feature = "edge")]
 async fn send_tile_render(world: &HittableList, i: usize, j: usize, dimi: usize, dimj: usize) -> Result<String, Box<dyn std::error::Error>> {
 
-	println!("send_tile_render {} {}", i, j);
+//	println!("send_tile_render {} {}", i, j);
 	let body = HittableListWithTile{
 		h: world.clone(),
 		i: i,
@@ -169,21 +126,22 @@ async fn send_tile_render(world: &HittableList, i: usize, j: usize, dimi: usize,
 	Ok(resp.text().await?)
 }
 
-pub async fn do_render() -> (u128, Vec<u8>) {
+pub async fn do_render(complexity: u32) -> (u128, Vec<u8>) {
 
 	let start = Instant::now();
-	let world = random_scene(None);
+	let world = scenes::scene_of_complexity(complexity);
 
 	// Render
 	let mut img: RgbImage = ImageBuffer::new(WIDTH as u32, HEIGHT as u32);
 
 	#[cfg(feature = "local")]
 	{
-		println!("LOCAL");
+//		println!("LOCAL");
 		let mut handles : Vec<thread::JoinHandle<Vec<ScreenPixel>>> = Vec::new();
 		handles.reserve((WIDTH*HEIGHT) / (TILE_DIM*TILE_DIM));
 		// we are missing the top scanline
-		if TILE_DIM >= HEIGHT || TILE_DIM >= WIDTH {
+//		if TILE_DIM >= HEIGHT || TILE_DIM >= WIDTH {
+		if true {
 			println!("Single threaded");
 			let p = render_tile(&world, 0,0, WIDTH, HEIGHT, WIDTH, HEIGHT);
 			for t in &p {
@@ -191,7 +149,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 				*pixel = image::Rgb([t.r, t.g, t.b]);
 			}
 		} else {
-			for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
+			for tj in (0..HEIGHT).step_by(TILE_DIM).rev() {
 				for ti in (0..WIDTH).step_by(TILE_DIM) {
 						let thread_world = world.clone();
 						handles.push(thread::spawn(move || {
@@ -200,7 +158,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 					}
 			}
 
-			println!("Waiting on {} handles", handles.len());
+//			println!("Waiting on {} handles", handles.len());
 			for h in handles {
 				let p = h.join().unwrap();
 				for t in &p {
@@ -212,7 +170,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 	}
 	#[cfg(feature = "edge")]
 	{
-		println!("EDGE");
+//		println!("EDGE");
 		let mut futures = Vec::new();
 		for tj in (0..HEIGHT-TILE_DIM).step_by(TILE_DIM).rev() {
 			for ti in (0..WIDTH).step_by(TILE_DIM) {
@@ -249,7 +207,7 @@ pub async fn do_render() -> (u128, Vec<u8>) {
 		}
 	}
 
-	print!("{} took {}ms\n", TILE_DIM, start.elapsed().as_millis());
+	print!("{} took {}ms\n", complexity, start.elapsed().as_millis());
 
 	let mut data = Vec::new();
 	let mut encoder = jpeg::JpegEncoder::new(&mut data);
@@ -261,7 +219,15 @@ pub async fn do_render() -> (u128, Vec<u8>) {
     )
     .unwrap();
 
-	img.save("image.jpg").unwrap();
+	let res = img.save("image.jpg");
+	match res {
+		Ok(_) => {
+//			println!("Saved");
+		},
+		Err(e) => {
+			println!("Error saving image {}", e);
+		}
+	}
 
 	(start.elapsed().as_millis(), data)
 }
