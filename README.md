@@ -1,6 +1,6 @@
 # Ray Tracing at the Edge
 
-![sample raytraced image](sample.png "Title")
+![sample raytraced image](sample.jpg "Title")
 
 ## Premise
 
