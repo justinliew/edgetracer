@@ -1,5 +1,7 @@
 # Ray Tracing at the Edge
 
+![sample raytraced image](sample.png "Title")
+
 ## Premise
 
 This repo is a prototype of a ray tracer based on [Ray Tracing in a Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
