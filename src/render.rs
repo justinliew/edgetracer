@@ -14,6 +14,8 @@ use crate::utils::{clamp};
 use image::codecs::jpeg;
 use image::{RgbImage, ImageBuffer};
 
+use rayon::prelude::*;
+
 #[cfg(not(feature = "ecp"))]
 use std::thread;
 
@@ -146,22 +148,19 @@ pub async fn do_render(complexity: u32, tile_dim: usize) -> (u128, Vec<u8>) {
 				*pixel = image::Rgb([t.r, t.g, t.b]);
 			}
 		} else {
+			let mut iter = vec![];
 			for tj in (0..HEIGHT).step_by(tile_dim).rev() {
 				for ti in (0..WIDTH).step_by(tile_dim) {
-						let thread_world = Arc::clone(&world);
-						handles.push(thread::spawn(move || {
-							render_tile(&thread_world, ti,tj, tile_dim, tile_dim, WIDTH, HEIGHT)
-						}));
-					}
-			}
-
-//			println!("Waiting on {} handles", handles.len());
-			for h in handles {
-				let p = h.join().unwrap();
-				for t in &p {
-					let pixel = img.get_pixel_mut(t.x as u32, (HEIGHT-t.y-1) as u32);
-					*pixel = image::Rgb([t.r, t.g, t.b]);
+					iter.push((ti,tj));
 				}
+			}
+			let res : Vec<ScreenPixel> = iter.into_par_iter().map(|i| {
+				let thread_world = Arc::clone(&world);
+				render_tile(&thread_world, i.0,i.1, tile_dim, tile_dim, WIDTH, HEIGHT)
+			}).flatten().collect();
+			for p in res {
+				let pixel = img.get_pixel_mut(p.x as u32, (HEIGHT-p.y-1) as u32);
+				*pixel = image::Rgb([p.r, p.g, p.b]);
 			}
 		}
 	}
