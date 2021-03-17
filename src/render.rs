@@ -148,7 +148,7 @@ pub async fn do_render(complexity: u32, tile_dim: usize) -> (u128, Vec<u8>) {
 		} else {
 			for tj in (0..HEIGHT).step_by(tile_dim).rev() {
 				for ti in (0..WIDTH).step_by(tile_dim) {
-						let thread_world = world.clone();
+						let thread_world = Arc::clone(&world);
 						handles.push(thread::spawn(move || {
 							render_tile(&thread_world, ti,tj, tile_dim, tile_dim, WIDTH, HEIGHT)
 						}));

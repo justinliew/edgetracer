@@ -7,12 +7,15 @@ mod hittable_list;
 mod material;
 mod utils;
 mod render;
+mod scenes;
 
 #[macro_use]
 extern crate serde;
 
 #[tokio::main]
 async fn main() {
-	render::do_render().await;
+//	for i in (75..150).step_by(1) {
+		render::do_render(100,100).await;
+//	}
 }
 

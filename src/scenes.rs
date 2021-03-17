@@ -17,7 +17,7 @@ Here is a basic heuristic for scene complexity:
 - parameters are complexity, tile size, edge vs local.
 */
 
-pub fn random_scene(seed: Option<u128>) -> HittableList {
+pub fn random_scene(seed: Option<u128>) -> Arc<HittableList> {
 
 	// TODO so we can reproduce scenes for perf testing
 	match seed {
@@ -63,10 +63,10 @@ pub fn random_scene(seed: Option<u128>) -> HittableList {
 	let mat3 = Arc::new(Material::Metal{albedo: Colour::new(0.7,0.6,0.5)});
 	world.add(Hittable::Sphere{centre: Point3::new(4.0,1.0,0.0), radius: 1.0, material: mat3});
 
-	world
+	Arc::new(world)
 }
 
-pub fn scene_of_complexity(complexity: u32) -> HittableList {
+pub fn scene_of_complexity(complexity: u32) -> Arc<HittableList> {
 
 	let mut world : HittableList = HittableList::new();
 
@@ -94,5 +94,5 @@ pub fn scene_of_complexity(complexity: u32) -> HittableList {
 		}
 	}
 
-	world
+	Arc::new(world)
 }
